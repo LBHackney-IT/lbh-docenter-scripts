@@ -1,0 +1,8 @@
+# Ignore everything
+*
+
+# Don't ignore these files.
+!README.md
+!.gitignore
+!Makefile
+!initialiseRepository.sh
