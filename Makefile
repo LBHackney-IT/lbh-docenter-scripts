@@ -4,5 +4,4 @@ init:
 
 .PHONY: db
 db:
-	./scrapers/databases.sh
-
+	./scrapers/databases.sh -d ./social-care-case-viewer-api

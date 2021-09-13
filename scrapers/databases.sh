@@ -1,4 +1,12 @@
 #!/bin/bash
 
+projectDirectory=''
 
-echo "hello!"
+while getopts 'd:' flag; do
+  case "${flag}" in
+    d) projectDirectory="${OPTARG}" ;;
+    *) error "Unexpected option ${flag}" ;;
+  esac
+done
+
+echo "hello! dirpath: ${projectDirectory}"
