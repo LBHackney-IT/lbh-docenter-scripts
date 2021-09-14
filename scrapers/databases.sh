@@ -9,27 +9,50 @@ while getopts 'd:' flag; do
   esac
 done
 
+# 1st arg: Class name that implements the interface
+# 2nd arg: Startup file path
+# If incorrect args get provided, this means there's an issue with
+# how the project is structured, so it's probably for the better to
+# exit entirely rather than to give a false positive impression.
+function find_class_interface {
+    local className=$1
+	local startupFilePath=$2
+
+    [ -z "$className" ] && { echo "Class name is not provided!"; exit 1; }
+    [ -z "$startupFilePath" ] && { echo "Startup file location is not provided!"; exit 1; }
+
+	local interfaceName=$( grep -oP -e "services\.(?:AddScoped|AddTransient|AddSingleton)<\K\w+(?=, $className>\(\)\;)" $startupFilePath)
+
+    if [ -z "$interfaceName" ]
+    then
+        echo "No interface was found!"
+        exit 1
+    else
+        echo $interfaceName
+    fi
+}
+
+
+
 # No need to search the project root or tests project
 apiProjectDirectory=$( find $projectDirectory -mindepth 1 -type d -iname '*Api' )
+startupFile=$( find $apiProjectDirectory -type f -name 'Startup.cs'  ) # Won't hurt to be safe
 
-# echo "something: ${apiProjectDirectory}"
 
 postgreContextsFiles=$( grep -rnwE $apiProjectDirectory -e 'public class \w+ : DbContext' )
 postgreContexts=$( echo $postgreContextsFiles | grep -woP '(?<=public class )\w+(?= \: DbContext)' )
-
-
-# for i in $postgreContexts
-# do
-#     echo "output: $i"
-# done
+# PostgreSQL contexts are injected as instances, so they don't have an interface
 
 
 mongoContextsFiles=$( grep -rlwE $apiProjectDirectory -e 'public IMongoCollection<BsonDocument> \w+ { get\; set\; }' )
-mongoContexts=$( grep -oP -e '(?<=public class )(\w+)(?= \: I\1)' $mongoContextsFiles )
+# Could probably grab interface directly, but I have hopes of extracting the whole op into func
 
 
-echo $mongoContextsList
+for file in $mongoContextsFiles
+do
+    mongoDBClass=$( grep -oP -e '(?<=public class )\w+(?= \: \w+$)' $file )
+    find_class_interface $mongoDBClass $startupFile
+done
 
 
-
-
+echo "Done!"
