@@ -9,19 +9,27 @@ while getopts 'd:' flag; do
   esac
 done
 
-echo "hello! dirpath: ${projectDirectory}"
-
 # No need to search the project root or tests project
 apiProjectDirectory=$( find $projectDirectory -mindepth 1 -type d -iname '*Api' )
 
 # echo "something: ${apiProjectDirectory}"
 
-postgreContextsList=$( grep -rnwE $apiProjectDirectory -e 'public class \w+ : DbContext' ) #'public\sclass\s\w+\s:\sDbContext'
+postgreContextsFiles=$( grep -rnwE $apiProjectDirectory -e 'public class \w+ : DbContext' )
+postgreContexts=$( echo $postgreContextsFiles | grep -woP '(?<=public class )\w+(?= \: DbContext)' )
 
-echo -e "Result: ${postgreContextsList}"
 
-mongoContextsList=$( grep -rlwE $apiProjectDirectory -e 'public IMongoCollection<BsonDocument> \w+ { get; set; }' )
+# for i in $postgreContexts
+# do
+#     echo "output: $i"
+# done
 
-echo -e "Mongo: ${mongoContextsList}"
 
-#'public class DatabaseContext : DbContext'
+mongoContextsFiles=$( grep -rlwE $apiProjectDirectory -e 'public IMongoCollection<BsonDocument> \w+ { get\; set\; }' )
+mongoContexts=$( grep -oP -e '(?<=public class )(\w+)(?= \: I\1)' $mongoContextsFiles )
+
+
+echo $mongoContextsList
+
+
+
+
