@@ -47,11 +47,22 @@ postgreContexts=$( echo $postgreContextsFiles | grep -woP '(?<=public class )\w+
 mongoContextsFiles=$( grep -rlwE $apiProjectDirectory -e 'public IMongoCollection<BsonDocument> \w+ { get\; set\; }' )
 # Could probably grab interface directly, but I have hopes of extracting the whole op into func
 
-
+# Need to also search "IMongoDatabase", which is part of Mongo Driver I assume.
+# Seems, there are a couple ways of implementing the MongoDB
 for file in $mongoContextsFiles
 do
-    mongoDBClass=$( grep -oP -e '(?<=public class )\w+(?= \: \w+$)' $file )
-    find_class_interface $mongoDBClass $startupFile
+    mongoDBClass=$( grep -oP -e '(?<=public class )\w+(?= \: \w+$)' $file ) # should call this get class within a file
+    interface=$( find_class_interface $mongoDBClass $startupFile )
+    echo "Debug!"
+    echo $interface
+    # Need to be able to handle dead ends like with the RainContext & commented out code... so selectors should start with \s+?(?<!\/\/)s+?
+    gateways=$( grep -rlwP $apiProjectDirectory -e "(?<=private readonly )$interface(?= \w+;)" )
+    echo $gateways
+    echo "Debug!"
+    # should be another for each
+    # I think you might want to get the interface name instead so you could trace this back to uc
+    gatewayUsingDBContext=$( grep -oP -e '(?<=public class )\w+(?= \: \w+$)' $gateways )
+    echo $gatewayUsingDBContext
 done
 
 
