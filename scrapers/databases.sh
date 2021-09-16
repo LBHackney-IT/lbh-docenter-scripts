@@ -60,8 +60,9 @@ do
     echo $gateways
     echo "Debug!"
     # should be another for each
-    # I think you might want to get the interface name instead so you could trace this back to uc
-    gatewayUsingDBContext=$( grep -oP -e '(?<=public class )\w+(?= \: \w+$)' $gateways )
+    # Retrieving the interface of a gateway that uses db context. Getting the interface to trace down
+    # the use cases that use this gateway as their dependency
+    gatewayInterface=$( grep -oP -e 'public class \w+ : \K\w+$)' $gateways )
     echo $gatewayUsingDBContext
 done
 
