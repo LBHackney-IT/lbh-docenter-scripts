@@ -62,8 +62,11 @@ do
     # should be another for each
     # Retrieving the interface of a gateway that uses db context. Getting the interface to trace down
     # the use cases that use this gateway as their dependency
-    gatewayInterface=$( grep -oP -e 'public class \w+ : \K\w+$)' $gateways )
-    echo $gatewayUsingDBContext
+    # TODO: Modify this to work with multiple inheritance (like : A, B)
+    gatewayInterface=$( grep -oP -e 'public class \w+ : \K\w+$' $gateways )
+    # Finds 2
+    usecases=$( grep -rlwP $apiProjectDirectory -e "(?<=private readonly )$gatewayInterface(?= \w+;)" )
+    echo $usecases
 done
 
 
