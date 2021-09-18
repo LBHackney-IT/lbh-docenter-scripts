@@ -64,9 +64,13 @@ do
     # the use cases that use this gateway as their dependency
     # TODO: Modify this to work with multiple inheritance (like : A, B)
     gatewayInterface=$( grep -oP -e 'public class \w+ : \K\w+$' $gateways )
-    # Finds 2
-    usecases=$( grep -rlwP $apiProjectDirectory -e "(?<=private readonly )$gatewayInterface(?= \w+;)" )
-    echo $usecases
+    echo "GWI: $gatewayInterface"
+    # Finds UC and another GW???
+    usecases=$( grep -rlwP $apiProjectDirectory -e "(?<=private readonly )$gatewayInterface(?= \w+;)" | grep -P ".+?\/V\d\/UseCase\/.+" )
+    for ucFile in $usecases
+    do
+        echo "uc: $ucFile"
+    done
 done
 
 
