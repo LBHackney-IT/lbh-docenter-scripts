@@ -69,7 +69,9 @@ do
     usecases=$( grep -rlwP $apiProjectDirectory -e "(?<=private readonly )$gatewayInterface(?= \w+;)" | grep -P ".+?\/V\d\/UseCase\/.+" )
     for ucFile in $usecases
     do
-        echo "uc: $ucFile"
+        # TODO: extract this Interface extraction command into a function - it's going to get used many times
+        ucInterface=$( grep -oP -e 'public class \w+ : \K\w+$' $ucFile )
+        echo "uc: $ucInterface"
     done
 done
 
