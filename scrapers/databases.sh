@@ -32,6 +32,21 @@ function find_class_interface {
     fi
 }
 
+# Gets the interface of the class within file
+function get_file_interface {
+    local filePath=$1
+
+    [ -z "$filePath" ] && { echo "File path is empty!"; exit 1; }
+
+    local interfaceName=$( grep -oP -e 'public class \w+ : \K\w+$' $filePath )
+
+    if [ -z "$interfaceName" ]
+    then
+        echo "No interface was found!" && exit 1
+    else
+        echo $interfaceName
+    fi
+}
 
 
 # No need to search the project root or tests project
@@ -53,24 +68,22 @@ for file in $mongoContextsFiles
 do
     mongoDBClass=$( grep -oP -e '(?<=public class )\w+(?= \: \w+$)' $file ) # should call this get class within a file
     interface=$( find_class_interface $mongoDBClass $startupFile )
-    echo "Debug!"
-    echo $interface
+
     # Need to be able to handle dead ends like with the RainContext & commented out code... so selectors should start with \s+?(?<!\/\/)s+?
     gateways=$( grep -rlwP $apiProjectDirectory -e "(?<=private readonly )$interface(?= \w+;)" )
-    echo $gateways
-    echo "Debug!"
+
     # should be another for each
     # Retrieving the interface of a gateway that uses db context. Getting the interface to trace down
     # the use cases that use this gateway as their dependency
     # TODO: Modify this to work with multiple inheritance (like : A, B)
-    gatewayInterface=$( grep -oP -e 'public class \w+ : \K\w+$' $gateways )
+    gatewayInterface=$( get_file_interface $gateways )
     echo "GWI: $gatewayInterface"
     # Finds UC and another GW???
     usecases=$( grep -rlwP $apiProjectDirectory -e "(?<=private readonly )$gatewayInterface(?= \w+;)" | grep -P ".+?\/V\d\/UseCase\/.+" )
     for ucFile in $usecases
     do
         # TODO: extract this Interface extraction command into a function - it's going to get used many times
-        ucInterface=$( grep -oP -e 'public class \w+ : \K\w+$' $ucFile )
+        ucInterface=$( get_file_interface $ucFile )
         echo "uc: $ucInterface"
     done
 done
