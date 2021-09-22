@@ -132,7 +132,7 @@ do
 
     # echo $endpointsList
     pcregrep -oM '\[Http\w+\]\s+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?IActionResult>? \w+' $controller | \
-    perl -0777 -pe 's/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\[\(\)\]]+)\"\)\])\s+)+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?IActionResult>? (\w+)/R: \2\; T: \1\; N: \3\;/gm' #'s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\[\(\)\]]+)\"\)\])\s+)+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?IActionResult>? (\w+)/Type\: \1; Route: \2; Name: \3;/gm' #'s/\[Http(\w+)\]\s+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?IActionResult>? (\w+)/\1 \2/g'
+    perl -0777 -pe 's/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\[\(\)\]]+)\"\)\])\s+)+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?IActionResult>? (\w+)/<R: \2\; T: \1\; N: \3\;>/gm'
 
     #cat $controller | perl -pe 's/\n//g' |
     #echo -e $usecasesList
