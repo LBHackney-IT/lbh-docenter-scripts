@@ -116,7 +116,8 @@ controllersList=$( find "$apiProjectDirectory/V1/Controllers" -mindepth 1 )
 for controller in $controllersList
 do
     echo -e "\n$controller"
-    # usecasesList=$( grep -oP -e "$dependencyPattern" $contoller )
+    usecasesVarsPattern=$( grep -oP -e "$dependencyVariablePattern" $controller | tr '\n' '|' | sed -E 's/\|$//g' )
+    echo $usecasesVarsPattern
     # for usecase in $usecasesList
     # do
     #     echo $usecase
