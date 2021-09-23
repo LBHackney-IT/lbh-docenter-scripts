@@ -136,7 +136,10 @@ do
     grep -oP '<[^<>]+>' | while read endpointInfo
     do
         endpointName=$( echo $endpointInfo | grep -oP '(?<=N: )\w+' )
-        pcregrep -oM "public (?:async Task<)?IActionResult>? $endpointName\([^\(\)]+\)(\s+)\{[\s\S]+?\1\}" $controller
+        pcregrep -oM "public (?:async Task<)?IActionResult>? $endpointName\([^\(\)]+\)(\s+)\{[\s\S]+?\1\}" $controller | \
+        grep -oP "(?:$usecasesVarsPattern)\.\w+" | while read usecaseCall ; do {
+            echo "st: $usecaseCall"
+        } ; done
     done
 
     #cat $controller | perl -pe 's/\n//g' |
