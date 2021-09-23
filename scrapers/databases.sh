@@ -132,7 +132,12 @@ do
 
     # echo $endpointsList
     pcregrep -oM '\[Http\w+\]\s+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?IActionResult>? \w+' $controller | \
-    perl -0777 -pe 's/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\[\(\)\]]+)\"\)\])\s+)+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?IActionResult>? (\w+)/<R: \2\; T: \1\; N: \3\;>/gm'
+    perl -0777 -pe 's/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\[\(\)\]]+)\"\)\])\s+)+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?IActionResult>? (\w+)/<R: \2\; T: \1\; N: \3\;>/gm' | \
+    grep -oP '<[^<>]+>' | while read endpointInfo
+    do
+        endpointName=$( echo $endpointInfo | grep -oP '(?<=N: )\w+' )
+        pcregrep -oM "public (?:async Task<)?IActionResult>? $endpointName\([^\(\)]+\)(\s+)\{[\s\S]+?\1\}" $controller
+    done
 
     #cat $controller | perl -pe 's/\n//g' |
     #echo -e $usecasesList
