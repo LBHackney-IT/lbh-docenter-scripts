@@ -116,23 +116,24 @@ controllersList=$( find "$apiProjectDirectory/V1/Controllers" -mindepth 1 )
 for controller in $controllersList
 do
     echo -e "\n$controller"
-    usecasesVarsPattern=$( grep -oP -e "$dependencyVariablePattern" $controller | tr '\n' '|' | sed -E 's/\|$//g' )
-    echo $usecasesVarsPattern
-    # for usecase in $usecasesList
-    # do
-    #     echo $usecase
-    # done
-    # endpointsList=$( pcregrep -oM '\[Http\w+\]\s+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?IActionResult>? \w+' $controller | perl -pe 's/\[Http(\w+)\]\s+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?IActionResult>? (\w+)/$1~$2/g' )
+    
+    usecasesVarsPattern=$( grep -oP -e "$dependencyVariablePattern" $controller | \
+        tr '\n' '|' | sed -E 's/\|$//g' )
 
+    # declare use case var to interface lookup
+    eval "declare -A ucInterfaceLookup=($(\
+        grep -oP "private readonly \K\w+ \w+" ./test/text.txt | \
+        sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
+        tr '\n' ' '))"
     # for endpoint in $endpointsList
     # do
     #     echo -e '\n'
     #     echo -e $endpoint
     # done
 
-    # echo $endpointsList
     pcregrep -oM '\[Http\w+\]\s+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?IActionResult>? \w+' $controller | \
-    perl -0777 -pe 's/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\[\(\)\]]+)\"\)\])\s+)+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?IActionResult>? (\w+)/<R: \2\; T: \1\; N: \3\;>/gm' | \
+    perl -0777 -pe 's/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\[\(\)\]]+)\"\)\])\s+)+(?:\[[^\[\]]+\]\s+)*public (?:async Task<)?'\
+'IActionResult>? (\w+)/<R: \2\; T: \1\; N: \3\;>/gm' | \
     grep -oP '<[^<>]+>' | while read endpointInfo
     do
         endpointName=$( echo $endpointInfo | grep -oP '(?<=N: )\w+' )
@@ -141,27 +142,15 @@ do
             echo "st: $usecaseCall"
         } ; done
     done
-
-    #cat $controller | perl -pe 's/\n//g' |
-    #echo -e $usecasesList
 done
 
 
-
+# All methods:
+# public (?:async Task<)?IActionResult>? \w+\([^\(\)]+\)(\s+)\{[\s\S]+?\1\}
 
 #Will need to ignore empty ones like Healthcheck
-
 
 echo "Done!"
 
 # DB Context --> Find Interface if any
 # DB Context -->                       --> Find 
-
-# declare -A arr
-
-# arr["key1"]=val1
-# arr+=( ["key2"]=val2 ["key3"]=val3 )
-
-# for key in ${!arr[@]}; do
-#     echo ${key} ${arr[${key}]}
-# done
