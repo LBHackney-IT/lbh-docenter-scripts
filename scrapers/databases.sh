@@ -55,6 +55,9 @@ function find_files_using_interface {
 
     [ -z "$interface" ] && { echo "Interface is empty!"; exit 1; }
     
+    # Not sure if it's better to reprint it, or to return as is.
+    #fileImplentingInterface=$( )
+    grep -rnwE $apiProjectDirectory -e "public class \w+ : $interface"
 }
 
 
@@ -139,7 +142,12 @@ do
         endpointName=$( echo $endpointInfo | grep -oP '(?<=N: )\w+' )
         pcregrep -oM "public (?:async Task<)?IActionResult>? $endpointName\([^\(\)]+\)(\s+)\{[\s\S]+?\1\}" $controller | \
         grep -oP "(?:$usecasesVarsPattern)\.\w+" | while read usecaseCall ; do {
-            echo "st: $usecaseCall"
+            usecaseMethod=$(echo "$usecaseCall" | grep -oP '\.\K\w+')
+            usecaseVarName=$(echo "$usecaseCall" | grep -oP '\w+(?=\.)')
+            echo $usecaseMethod
+            echo $usecaseVarName
+            echo ${ucInterfaceLookup[$usecaseVarName]}
+            find_files_using_interface ${ucInterfaceLookup[$usecaseVarName]}
         } ; done
     done
 done
