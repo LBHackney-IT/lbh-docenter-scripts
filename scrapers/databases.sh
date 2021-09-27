@@ -57,7 +57,7 @@ function find_files_using_interface {
     
     # Not sure if it's better to reprint it, or to return as is.
     #fileImplentingInterface=$( )
-    grep -rnwE $apiProjectDirectory -e "public class \w+ : $interface"
+    grep -rlwE $apiProjectDirectory -e "public class \w+ : $interface"
 }
 
 
@@ -125,7 +125,7 @@ do
 
     # declare use case var to interface lookup
     eval "declare -A ucInterfaceLookup=($(\
-        grep -oP "private readonly \K\w+ \w+" ./test/text.txt | \
+        grep -oP "private readonly \K\w+ \w+" $controller | \
         sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
         tr '\n' ' '))"
     # for endpoint in $endpointsList
@@ -147,6 +147,7 @@ do
             echo $usecaseMethod
             echo $usecaseVarName
             echo ${ucInterfaceLookup[$usecaseVarName]}
+            # UC File
             find_files_using_interface ${ucInterfaceLookup[$usecaseVarName]}
         } ; done
     done
