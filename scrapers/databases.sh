@@ -126,7 +126,7 @@ do
 
     # declare use case var to interface lookup
     eval "declare -A ucInterfaceLookup=($(\
-        grep -oP "private readonly \K\w+ \w+" $controller | \
+        grep -oP "private(?: readonly)? \K\w+ \w+" $controller | \
         sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
         tr '\n' ' '))"
     # for endpoint in $endpointsList
@@ -154,7 +154,7 @@ do
                 tr '\n' '|' | sed -E 's/\|$//g' )
 
             eval "declare -A gwInterfaceLookup=($(\
-                grep -oP "private readonly \K\w+ \w+" $ucFileName | \
+                grep -oP "private(?: readonly)? \K\w+ \w+" $ucFileName | \
                 sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
                 tr '\n' ' '))"
 
