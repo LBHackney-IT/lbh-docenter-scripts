@@ -152,8 +152,16 @@ do
             ucFileName=$(find_files_using_interface ${ucInterfaceLookup[$usecaseVarName]})
             gatewayVarsPattern=$( grep -oP -e "$dependencyVariablePattern" $ucFileName | \
                 tr '\n' '|' | sed -E 's/\|$//g' )
-            echo $gatewayVarsPattern
+
+            pcregrep -oM "public [^\s]+ $usecaseMethod\([^\(\)]+\)(\s+)\{[\s\S]+?(?=\1\})" $ucFileName | \
+            grep -oP "(?:$gatewayVarsPattern)\.\w+" | while read gatewayCall ; do {
+                gatewayMethod=$(echo "$gatewayCall" | grep -oP '\.\K\w+')
+                gatewayVarName=$(echo "$gatewayCall" | grep -oP '\w+(?=\.)')
+                echo "Method: $gatewayMethod"
+                echo "VarName: $gatewayVarName"
+            } ; done
         } ; done
+        echo "E--------------------------------"
     done
 done
 
