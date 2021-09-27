@@ -102,10 +102,11 @@ done
 
 echo "Start!"
 
-dependencyInterfacePattern='(?<=private readonly )\w+(?= \w+;)'
-dependencyVariablePattern='(?<=private readonly )\w+ \K\w+(?=;)'
+#can't guarantee readonly because of shit code quality that devs produce
+dependencyInterfacePattern='private(?: readonly)? \K\w+(?= \w+;)'
+dependencyVariablePattern='private(?: readonly)? \K\w+ \K\w+(?=;)'
 
-dependencyPattern='(?<=private readonly )\w+ \w+(?=;)'
+dependencyPattern='private(?: readonly)? \K\w+ \w+(?=;)'
 
 endpointTypePattern='(?<=[Http)\w+'
 endpointName='(IActionResult>? \K\w+)'
@@ -148,7 +149,10 @@ do
             echo $usecaseVarName
             echo ${ucInterfaceLookup[$usecaseVarName]}
             # UC File
-            find_files_using_interface ${ucInterfaceLookup[$usecaseVarName]}
+            ucFileName=$(find_files_using_interface ${ucInterfaceLookup[$usecaseVarName]})
+            gatewayVarsPattern=$( grep -oP -e "$dependencyVariablePattern" $ucFileName | \
+                tr '\n' '|' | sed -E 's/\|$//g' )
+            echo $gatewayVarsPattern
         } ; done
     done
 done
