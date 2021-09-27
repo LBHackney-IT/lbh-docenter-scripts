@@ -162,8 +162,23 @@ do
             grep -oP "(?:$gatewayVarsPattern)\.\w+" | while read gatewayCall ; do {
                 gatewayMethod=$(echo "$gatewayCall" | grep -oP '\.\K\w+')
                 gatewayVarName=$(echo "$gatewayCall" | grep -oP '\w+(?=\.)')
+
                 gwFileName=$(find_files_using_interface ${gwInterfaceLookup[$gatewayVarName]})
-                echo "GW file: $gwFileName"
+                echo "$gatewayCall: $gwFileName"
+
+                if [ -n "$(echo $gwFileName | tr -d ' ')" ]
+                then
+                    databaseVarsPattern=$( grep -oP -e "$dependencyVariablePattern" $gwFileName | \
+                        tr '\n' '|' | sed -E 's/\|$//g' )
+                    
+                    eval "declare -A dbInterfaceLookup=($(\
+                        grep -oP "private(?: readonly)? \K\w+ \w+" $gwFileName | \
+                        sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
+                        tr '\n' ' '))"
+                    
+                    pcregrep -oM "public [^\s]+ $gatewayMethod\([^\(\)]+\)(\s+)\{[\s\S]+?(?=\1\})" $gwFileName | \
+                    grep -oP "(?:$databaseVarsPattern)\.\w+"
+                fi
             } ; done
         } ; done
         echo "E--------------------------------"
