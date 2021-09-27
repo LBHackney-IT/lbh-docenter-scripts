@@ -153,12 +153,17 @@ do
             gatewayVarsPattern=$( grep -oP -e "$dependencyVariablePattern" $ucFileName | \
                 tr '\n' '|' | sed -E 's/\|$//g' )
 
+            eval "declare -A gwInterfaceLookup=($(\
+                grep -oP "private readonly \K\w+ \w+" $ucFileName | \
+                sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
+                tr '\n' ' '))"
+
             pcregrep -oM "public [^\s]+ $usecaseMethod\([^\(\)]+\)(\s+)\{[\s\S]+?(?=\1\})" $ucFileName | \
             grep -oP "(?:$gatewayVarsPattern)\.\w+" | while read gatewayCall ; do {
                 gatewayMethod=$(echo "$gatewayCall" | grep -oP '\.\K\w+')
                 gatewayVarName=$(echo "$gatewayCall" | grep -oP '\w+(?=\.)')
-                echo "Method: $gatewayMethod"
-                echo "VarName: $gatewayVarName"
+                gwFileName=$(find_files_using_interface ${gwInterfaceLookup[$gatewayVarName]})
+                echo "GW file: $gwFileName"
             } ; done
         } ; done
         echo "E--------------------------------"
