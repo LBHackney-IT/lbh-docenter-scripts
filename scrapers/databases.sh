@@ -158,7 +158,7 @@ do
                 sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
                 tr '\n' ' '))"
 
-            pcregrep -oM "public [^\s]+ $usecaseMethod\([^\(\)]+\)(\s+)\{[\s\S]+?(?=\1\})" $ucFileName | \
+            pcregrep -oM "(?:(?:public|static) )+\S+\?? $usecaseMethod\([^\(\)]+\)(\s+)\{[\s\S]+?(?=\1\})" $ucFileName | \
             grep -oP "(?:$gatewayVarsPattern)\.\w+" | while read gatewayCall ; do {
                 gatewayMethod=$(echo "$gatewayCall" | grep -oP '\.\K\w+')
                 gatewayVarName=$(echo "$gatewayCall" | grep -oP '\w+(?=\.)')
@@ -176,7 +176,7 @@ do
                         sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
                         tr '\n' ' '))"
                     
-                    pcregrep -oM "public [^\s]+ $gatewayMethod\([^\(\)]+\)(\s+)\{[\s\S]+?(?=\1\})" $gwFileName | \
+                    pcregrep -oM "(?:(?:public|static) )+\S+\?? $gatewayMethod\([^\(\)]+\)(\s+)\{[\s\S]+?(?=\1\})" $gwFileName | \
                     grep -oP "(?:$databaseVarsPattern)\.\w+"
                 fi
             } ; done
