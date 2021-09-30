@@ -100,6 +100,17 @@ do
     done
 done
 
+function methodBlock {
+    local methodNamePattern=$1
+    
+    if [ -z "$methodNamePattern" ]
+    then
+        methodNamePattern='\w+'
+    fi
+
+    echo "(?:(?:public|static|private) )+\S+\?? $methodNamePattern\((?:[^\(\)]+)?\)(\s+)\{[\s\S]+?\1\}"
+}
+
 echo "Start!"
 
 #can't guarantee readonly because of shit code quality that devs produce
