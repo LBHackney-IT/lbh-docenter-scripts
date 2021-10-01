@@ -111,6 +111,16 @@ function methodBlock {
     echo "(?:(?:public|static|private) )+\S+\?? $methodNamePattern\((?:[^\(\)]+)?\)(\s+)\{[\s\S]+?\1\}"
 }
 
+methodSignature='(?:(?:public|static|private) )+\S+\?? \w+\((?:[^\(\)]+)?\)'
+
+function fileMethodNamesPattern {
+    local fileName=$1
+    grep -oP "$methodSignature" $fileName | \
+    grep -oP '\w+(?=\s*\((?:[^\(\)]+)?\))' | \
+    tr '\n' '|' | \
+    sed -E 's/\|$//g;s/(.+)/\(\?:\1\)/'
+}
+
 echo "Start!"
 
 #can't guarantee readonly because of shit code quality that devs produce
