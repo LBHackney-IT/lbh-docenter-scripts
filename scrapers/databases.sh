@@ -128,6 +128,14 @@ function fileMethodCallsWithinMethodPattern {
     echo "(?<!public)(?<!static)(?<!private) \S+\?? \K$(fileMethodNamesPattern $fileName)(?=\((?:[^\(\)]+)?\))"
 }
 
+# inner method calls to other methods defined in file
+function getFileScopeMethodCallsWithinMethod {
+    local methodName=$1
+    local filePath=$2
+    pcregrep -oM "$(methodBlock $methodName)" $filePath | \
+    grep -oP "$(fileMethodCallsWithinMethodPattern $filePath)" 
+}
+
 echo "Start!"
 
 #can't guarantee readonly because of shit code quality that devs produce
