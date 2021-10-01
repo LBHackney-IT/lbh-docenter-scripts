@@ -121,6 +121,13 @@ function fileMethodNamesPattern {
     sed -E 's/\|$//g;s/(.+)/\(\?:\1\)/'
 }
 
+# Might be overkill, but it's best to make sure
+# That the calls are to the local scope functions
+function fileMethodCallsWithinMethodPattern {
+    local fileName=$1
+    echo "(?<!public)(?<!static)(?<!private) \S+\?? \K$(fileMethodNamesPattern $fileName)(?=\((?:[^\(\)]+)?\))"
+}
+
 echo "Start!"
 
 #can't guarantee readonly because of shit code quality that devs produce
