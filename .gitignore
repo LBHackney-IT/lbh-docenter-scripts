@@ -5,6 +5,7 @@
 # Don't ignore these files.
 !README.md
 !/scrapers/
+!/test/
 !.gitignore
 !Makefile
 !initialiseRepository.sh
