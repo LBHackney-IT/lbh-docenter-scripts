@@ -40,3 +40,38 @@ function getFileScopeMethodCallsWithinMethod {
 echo "Start!"
 
 dependencyVariablePattern='private(?: readonly)? \K\w+ \K\w+(?=;)'
+
+function scanAndFollowDependencies {
+    # If not controller, then use 2nd var 
+    local scannedFile=$1
+    echo $scannedFile
+    local dependencyVariablesSearchPattern=$(grep -oP -e "$dependencyVariablePattern" $scannedFile | \
+        tr '\n' '|' | sed -E 's/\|$//g' )
+    
+
+    # local by default
+    eval "declare -A dependencyTypeLookup=($(\
+        grep -oP "private(?: readonly)? \K\w+ \w+" $scannedFile | \
+        sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
+        tr '\n' ' '))"
+    
+    
+    for x in "${!dependencyTypeLookup[@]}"; do printf "[%s]=%s\n" "$x" "${dependencyTypeLookup[$x]}" ; done
+
+
+    (grep -wq ": Controller" $scannedFile)
+    local isController=$?
+    
+    if [[ $isController -ne 1 ]]; then
+        pcregrep -oM '(?:\[[^\[\]]+\]\s+)+public \S+ \w+' $scannedFile | \
+        perl -0777 -pe 's/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<R: \2\; T: \1\; N: \3\;>/gm' | \
+        grep -oP '<[^<>]+>' | while read endpointInfo ; do {
+            echo $endpointInfo
+        } ; done
+    else
+        echo UC
+    fi
+}
+
+scanAndFollowDependencies ./test/controller.txt
+
