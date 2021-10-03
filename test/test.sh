@@ -47,6 +47,16 @@ function get_controller_route {
     grep -oP '\[Route\(\"\K[^"]+(?=\"\)\])'
 }
 
+function find_files_using_interface {
+    local interface=$1
+    # apiProjectDirectory
+    local startDirectory=$2
+
+    [ -z "$interface" ] && { echo "Interface is empty!"; exit 1; }
+
+    grep -rlwE $startDirectory -e "public class \w+ : $interface"
+}
+
 
 endpointMetadata='(?:\[[^\[\]]+\]\s+)+public \S+ \w+\b(?! : Controller\n)'
 methodBlock='\([^\(\)]*\)(\s+)\{[\s\S]+?\1\}'
@@ -55,7 +65,7 @@ methodSig='\s+(?:(?:public|static|private) )+\S+\?? \w+'
 function scanAndFollowDependencies {
     # If not controller, then use 2nd var 
     local scannedFile=$1
-    echo $scannedFile
+    # echo $scannedFile
     local dependencyVariablesSearchPattern=$(grep -oP -e "$dependencyVariablePattern" $scannedFile | \
         tr '\n' '|' | sed -E 's/\|$//g' )
     
@@ -67,7 +77,7 @@ function scanAndFollowDependencies {
         tr '\n' ' '))"
     
     
-    for x in "${!dependencyTypeLookup[@]}"; do printf "[%s]=%s\n" "$x" "${dependencyTypeLookup[$x]}" ; done
+    # for x in "${!dependencyTypeLookup[@]}"; do printf "[%s]=%s\n" "$x" "${dependencyTypeLookup[$x]}" ; done
 
 
     (grep -wq ": Controller" $scannedFile)
@@ -80,13 +90,20 @@ function scanAndFollowDependencies {
         perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<R: $controllerRoute\/\2\; T: \1\; N: \3\;>/gm; s/R: .+?\K\/\/(?=[^\;]+\;)/\//gm" | \
         grep -oP '<[^<>]+>' | \
         while read endpointInfo ; do {
-            echo -e "\n$endpointInfo"
+            # echo -e "\n$endpointInfo"
             endpointName=$( echo $endpointInfo | grep -oP '(?<=N: )\w+' )
-            echo $endpointName
+            # echo $endpointName
 
             pcregrep -M "(?:\[[^\[\]]+\]\s+)+public \S+ $endpointName\b(?! : Controller\n)$methodBlock" $scannedFile | \
             grep -oP "(?:$dependencyVariablesSearchPattern)\.\w+" | while read dependencyCall ; do {
-                echo $dependencyCall
+                # echo $dependencyCall
+                dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
+                dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
+
+                # uc implementing interface, HARDCODED start directory
+                dependencyFileName=$(find_files_using_interface ${dependencyTypeLookup[$dependencyVarName]} ./test/)
+                echo $dependencyFileName
+                scanAndFollowDependencies $dependencyFileName
             } ; done
         } ; done
     else
