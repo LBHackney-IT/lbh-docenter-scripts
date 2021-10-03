@@ -63,7 +63,7 @@ function scanAndFollowDependencies {
     local isController=$?
     
     if [[ $isController -ne 1 ]]; then
-        pcregrep -oM '(?:\[[^\[\]]+\]\s+)+public \S+ \w+\b(?! : Controller\n)' $scannedFile | \
+        pcregrep -M '(?:\[[^\[\]]+\]\s+)+public \S+ \w+\b(?! : Controller\n)' $scannedFile | \
         perl -0777 -pe 's/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<R: \2\; T: \1\; N: \3\;>/gm' | \
         grep -oP '<[^<>]+>' | while read endpointInfo ; do {
             echo $endpointInfo
