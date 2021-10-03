@@ -41,6 +41,12 @@ echo "Start!"
 
 dependencyVariablePattern='private(?: readonly)? \K\w+ \K\w+(?=;)'
 
+function get_controller_route {
+    local controllerFilePath=$1
+    pcregrep -oM '\[Route\(\"[^"]+\"\)\][\S\s]+public class \w+ : Controller' $controllerFilePath |
+    grep -oP '\[Route\(\"\K[^"]+(?=\"\)\])'
+}
+
 function scanAndFollowDependencies {
     # If not controller, then use 2nd var 
     local scannedFile=$1
@@ -63,9 +69,12 @@ function scanAndFollowDependencies {
     local isController=$?
     
     if [[ $isController -ne 1 ]]; then
+        local controllerRoute=$(get_controller_route $scannedFile | sed -E 's/\//\\\//g')
+
         pcregrep -M '(?:\[[^\[\]]+\]\s+)+public \S+ \w+\b(?! : Controller\n)' $scannedFile | \
-        perl -0777 -pe 's/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<R: \2\; T: \1\; N: \3\;>/gm' | \
-        grep -oP '<[^<>]+>' | while read endpointInfo ; do {
+        perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<R: $controllerRoute\/\2\; T: \1\; N: \3\;>/gm; s/R: .+?\K\/\/(?=[^\;]+\;)/\//gm" | \
+        grep -oP '<[^<>]+>' | \
+        while read endpointInfo ; do {
             echo $endpointInfo
         } ; done
     else
