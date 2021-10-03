@@ -47,6 +47,11 @@ function get_controller_route {
     grep -oP '\[Route\(\"\K[^"]+(?=\"\)\])'
 }
 
+
+endpointMetadata='(?:\[[^\[\]]+\]\s+)+public \S+ \w+\b(?! : Controller\n)'
+methodBlock='\([^\(\)]*\)(\s+)\{[\s\S]+?\1\}'
+methodSig='\s+(?:(?:public|static|private) )+\S+\?? \w+'
+
 function scanAndFollowDependencies {
     # If not controller, then use 2nd var 
     local scannedFile=$1
@@ -71,16 +76,25 @@ function scanAndFollowDependencies {
     if [[ $isController -ne 1 ]]; then
         local controllerRoute=$(get_controller_route $scannedFile | sed -E 's/\//\\\//g')
 
-        pcregrep -M '(?:\[[^\[\]]+\]\s+)+public \S+ \w+\b(?! : Controller\n)' $scannedFile | \
+        pcregrep -M "$endpointMetadata" $scannedFile | \
         perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<R: $controllerRoute\/\2\; T: \1\; N: \3\;>/gm; s/R: .+?\K\/\/(?=[^\;]+\;)/\//gm" | \
         grep -oP '<[^<>]+>' | \
         while read endpointInfo ; do {
-            echo $endpointInfo
+            echo -e "\n$endpointInfo"
+            endpointName=$( echo $endpointInfo | grep -oP '(?<=N: )\w+' )
+            echo $endpointName
+
+            pcregrep -M "(?:\[[^\[\]]+\]\s+)+public \S+ $endpointName\b(?! : Controller\n)$methodBlock" $scannedFile | \
+            grep -oP "(?:$dependencyVariablesSearchPattern)\.\w+" | while read dependencyCall ; do {
+                echo $dependencyCall
+            } ; done
         } ; done
     else
         echo UC
     fi
 }
+
+scanAndFollowDependencies ./test/controller1.txt
 
 scanAndFollowDependencies ./test/controller.txt
 
