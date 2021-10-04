@@ -8,7 +8,7 @@ function methodBlock {
         methodNamePattern='\w+'
     fi
 
-    echo "(?:(?:public|static|private) )+\S+\?? $methodNamePattern\((?:[^\(\)]+)?\)(\s+)\{[\s\S]+?\1\}"
+    echo "\n\s+(?>(?:public|static|private) )+\S+\?? $methodNamePattern\([^\(\)]*\)(\s+)\{[\s\S]+?\1\}"
 }
 
 
@@ -16,8 +16,8 @@ methodSignature='(?:(?:public|static|private) )+\S+\?? \w+\((?:[^\(\)]+)?\)'
 
 function fileMethodNamesPattern {
     local fileName=$1
-    grep -oP "$methodSignature" $fileName | \
-    grep -oP '\w+(?=\s*\((?:[^\(\)]+)?\))' | \
+    pcregrep -M "$methodSignature" $fileName | \
+    grep -oP '\w+(?=\s*\([^\(\)]*\))' | \
     tr '\n' '|' | \
     sed -E 's/\|$//g;s/(.+)/\(\?:\1\)/'
 }
@@ -32,7 +32,7 @@ function fileMethodCallsWithinMethodPattern {
 function getFileScopeMethodCallsWithinMethod {
     local methodName=$1
     local filePath=$2
-    pcregrep -oM "$(methodBlock $methodName)" $filePath | \
+    pcregrep -M "$(methodBlock $methodName)" $filePath | \
     grep -oP "$(fileMethodCallsWithinMethodPattern $filePath)" 
 }
 
