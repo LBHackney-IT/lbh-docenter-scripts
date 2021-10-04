@@ -66,6 +66,18 @@ function scanAndFollowDependencies {
     # If not controller, then use 2nd var 
     local scannedFile=$1
     # echo $scannedFile
+
+    if [ -z "$scannedFile" ]
+    then
+        # temporary silly resolution for the base case
+        # TODO: implement some accumulator? And then compact its data
+        # could be  <R: /v1/*; T: Get; N: GetWorkerById; CallChain: UCMethod1, UCMethod2, GWMethod1, DBContext1; DBContext2>
+        # Could maybe even include the DBContext collection name or smth.
+        # Call chain could become useful later down the line
+        echo "Base Case!"
+        exit 0
+    fi
+
     local dependencyVariablesSearchPattern=$(grep -oP -e "$dependencyVariablePattern" $scannedFile | \
         tr '\n' '|' | sed -E 's/\|$//g' )
     
@@ -107,9 +119,25 @@ function scanAndFollowDependencies {
             } ; done
         } ; done
     else
-        echo UC
+        # apply inner file calls
+        echo UC GW, etc.
+
+        # methodSignature --> problem I don't have $usecaseMethod in this context!!!!!!!! Need an extra var in the function
+        # Make "methodSignature" into a functino that accepts a name
+        pcregrep -oM "$(methodBlock $calledMethod)" $scannedFile | \
+            grep -oP "(?:$dependencyVariablesSearchPattern)\.\w+" | while read dependencyCall ; do {
+                # I don't think I'll use the method
+                dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
+                dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
+
+                dependencyFileName=$(find_files_using_interface ${dependencyTypeLookup[$dependencyVarName]} ./test/)
+                # TODO: add validation to check it not being empty
+                scanAndFollowDependencies $dependencyFileName
+            } ; done
+
     fi
 }
+scanAndFollowDependencies ./test/controller.txt
 
 scanAndFollowDependencies ./test/controller1.txt
 
