@@ -44,7 +44,7 @@ dependencyVariablePattern='private(?: readonly)? \K\w+ \K\w+(?=;)'
 function append_to_endpoint_info {
     local oldEndpointInfo=$1
     local methodName=$2
-    echo $oldEndpointInfo | perl -pe "s/(?<=CallChain: )([\w ,]+)(?=\;)/\1, $methodName/g"
+    echo $oldEndpointInfo | perl -pe "s/(?<=CallChain: )([\w ,]+)(?=!)/\1, $methodName/g"
 }
 
 function get_controller_route {
@@ -71,6 +71,8 @@ methodSig='\s+(?:(?:public|static|private) )+\S+\?? \w+'
 function scanAndFollowDependencies {
     # If not controller, then use 2nd var 
     local scannedFile=$1
+    # Only present when its not a root of the call chain
+    local accumulator=$2
     # echo $scannedFile
 
     if [ -z "$scannedFile" ]
@@ -101,32 +103,45 @@ function scanAndFollowDependencies {
     (grep -wq ": Controller" $scannedFile)
     local isController=$?
     
+    # You can instead just set variables for patterns within this block, rather than do all this heavy logic
     if [[ $isController -ne 1 ]]; then
         local controllerRoute=$(get_controller_route $scannedFile | sed -E 's/\//\\\//g')
 
         pcregrep -M "$endpointMetadata" $scannedFile | \
-        perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<R: $controllerRoute\/\2\; T: \1\; N: \3\;>/gm; s/R: .+?\K\/\/(?=[^\;]+\;)/\//gm" | \
+        perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<Route: $controllerRoute\/\2! Type: \1! Name: \3! CallChain: \3!>/gm; s/R: .+?\K\/\/(?=[^!]+!)/\//gm" | \
         grep -oP '<[^<>]+>' | \
         while read endpointInfo ; do {
             # echo -e "\n$endpointInfo"
-            endpointName=$( echo $endpointInfo | grep -oP '(?<=N: )\w+' )
+            endpointName=$( echo $endpointInfo | grep -oP '(?<=Name: )\w+' )
             # echo $endpointName
 
             pcregrep -M "(?:\[[^\[\]]+\]\s+)+public \S+ $endpointName\b(?! : Controller\n)$methodBlock" $scannedFile | \
             grep -oP "(?:$dependencyVariablesSearchPattern)\.\w+" | while read dependencyCall ; do {
                 # echo $dependencyCall
                 dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
+                
+                #--------------------------Test--------------------
+                if [[ $dependencyMethod == "ExecutePost" ]]
+                then
                 dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
 
                 # uc implementing interface, HARDCODED start directory
                 dependencyFileName=$(find_files_using_interface ${dependencyTypeLookup[$dependencyVarName]} ./test/)
-                echo $dependencyFileName
-                scanAndFollowDependencies $dependencyFileName
+
+                    local newAcc=$(append_to_endpoint_info "$endpointInfo" "$dependencyMethod")
+
+                    scanAndFollowDependencies "$dependencyFileName" "$newAcc"
+                else
+                    echo "Skip"
+                fi
+                #------------------------End-Test--------------------
+
             } ; done
         } ; done
     else
         # apply inner file calls
         echo UC GW, etc.
+        local calledMethod=$(echo $accumulator | grep -oP '(?<= )\w+(?=!\>)')
 
         # methodSignature --> problem I don't have $usecaseMethod in this context!!!!!!!! Need an extra var in the function
         # Make "methodSignature" into a functino that accepts a name
@@ -138,7 +153,7 @@ function scanAndFollowDependencies {
 
                 dependencyFileName=$(find_files_using_interface ${dependencyTypeLookup[$dependencyVarName]} ./test/)
                 # TODO: add validation to check it not being empty
-                scanAndFollowDependencies $dependencyFileName
+                scanAndFollowDependencies "$dependencyFileName" "$(append_to_endpoint_info "$accumulator" "$dependencyMethod")"
             } ; done
 
     fi

@@ -31,12 +31,6 @@ namespace SocialCareCaseViewerApi.V1.UseCase
                 domainWorkers.Add(workerById);
             }
 
-            var ee = new Something(){
-                something = "asdf",
-                pukurino = 789,
-                koko = "qweqweqw"
-            }
-
             var workerByEmail = GetByWorkerEmail(request.Email);
             if (workerByEmail != null)
             {
@@ -59,22 +53,6 @@ namespace SocialCareCaseViewerApi.V1.UseCase
         public WorkerResponse ExecutePost(CreateWorkerRequest createWorkerRequest)
         {
             return _databaseGateway.CreateWorker(createWorkerRequest).ToDomain(true).ToResponse();
-        }
-
-        public static ResidentInformation ToDomain(this Person databaseEntity)
-        {
-            return new ResidentInformation
-            {
-                PersonId = databaseEntity.Id.ToString(),
-                Title = databaseEntity.Title,
-                FirstName = databaseEntity.FirstName,
-                LastName = databaseEntity.LastName,
-                DateOfBirth = databaseEntity.DateOfBirth?.ToString("O"),
-                Gender = databaseEntity.Gender,
-                Nationality = databaseEntity.Nationality,
-                NhsNumber = databaseEntity.NhsNumber?.ToString(),
-
-            };
         }
 
         public void ExecutePatch(UpdateWorkerRequest updateWorkerRequest)
