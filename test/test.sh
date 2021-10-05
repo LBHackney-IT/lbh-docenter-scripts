@@ -41,6 +41,12 @@ echo "Start!"
 
 dependencyVariablePattern='private(?: readonly)? \K\w+ \K\w+(?=;)'
 
+function append_to_endpoint_info {
+    local oldEndpointInfo=$1
+    local methodName=$2
+    echo $oldEndpointInfo | perl -pe "s/(?<=CallChain: )([\w ,]+)(?=\;)/\1, $methodName/g"
+}
+
 function get_controller_route {
     local controllerFilePath=$1
     pcregrep -oM '\[Route\(\"[^"]+\"\)\][\S\s]+public class \w+ : Controller' $controllerFilePath |
