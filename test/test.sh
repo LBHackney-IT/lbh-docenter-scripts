@@ -135,7 +135,7 @@ function scanAndFollowDependencies {
             # echo $endpointName
 
             pcregrep -M "(?:\[[^\[\]]+\]\s+)+public \S+ $endpointName\b(?! : Controller\n)$methodBlock" $scannedFile | \
-            grep -oP "(?:$dependencyVariablesSearchPattern)\.\w+" | while read dependencyCall ; do {
+            grep -oP "(?>(?:$dependencyVariablesSearchPattern)\.\w+)(?!\.)" | while read dependencyCall ; do {
                 # echo $dependencyCall
                 dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
                 
@@ -164,8 +164,7 @@ function scanAndFollowDependencies {
 
         # methodSignature --> problem I don't have $usecaseMethod in this context!!!!!!!! Need an extra var in the function
         # Make "methodSignature" into a functino that accepts a name
-        pcregrep -oM "$(methodBlock $calledMethod)" $scannedFile | \
-            grep -oP "(?:$dependencyVariablesSearchPattern)\.\w+" | while read dependencyCall ; do {
+            grep -oP "(?>(?:$dependencyVariablesSearchPattern)\.\w+)(?!\.)" | while read dependencyCall ; do {
                 # I don't think I'll use the method
                 dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
                 dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
