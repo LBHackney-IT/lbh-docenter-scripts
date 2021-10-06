@@ -63,6 +63,25 @@ function find_files_using_interface {
     grep -rlwE $startDirectory -e "public class \w+ : $interface"
 }
 
+function find_files_using_class {
+    local class=$1
+    local startDirectory=$2
+    # Not convinced on the value of exit codes yet
+    grep -rlwE $startDirectory -e "public class $class : \w+"
+}
+
+# There should be only one file that contains the dependency method
+# from the call
+function find_files_by_dependency_type {
+    local dataType=$1
+    local startDirectory=$2
+    local dependencyFile=$(find_files_using_interface $dataType $startDirectory)
+    if [ -z "$dependencyFile" ]
+    then
+        dependencyFile=$(find_files_using_class $dataType $startDirectory)
+    fi
+    echo $dependencyFile
+}
 
 endpointMetadata='(?:\[[^\[\]]+\]\s+)+public \S+ \w+\b(?! : Controller\n)'
 methodBlock='\([^\(\)]*\)(\s+)\{[\s\S]+?\1\}'
@@ -92,7 +111,7 @@ function scanAndFollowDependencies {
 
     # local by default
     eval "declare -A dependencyTypeLookup=($(\
-        grep -oP "private(?: readonly)? \K\w+ \w+" $scannedFile | \
+        grep -oP "private(?: readonly)? \K\w+ \w+(?=\;)" $scannedFile | \
         sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
         tr '\n' ' '))"
     
@@ -126,7 +145,7 @@ function scanAndFollowDependencies {
                 dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
 
                 # uc implementing interface, HARDCODED start directory
-                dependencyFileName=$(find_files_using_interface ${dependencyTypeLookup[$dependencyVarName]} ./test/)
+                    dependencyFileName=$(find_files_by_dependency_type ${dependencyTypeLookup[$dependencyVarName]} ./test/)
 
                     local newAcc=$(append_to_endpoint_info "$endpointInfo" "$dependencyMethod")
 
@@ -151,7 +170,7 @@ function scanAndFollowDependencies {
                 dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
                 dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
 
-                dependencyFileName=$(find_files_using_interface ${dependencyTypeLookup[$dependencyVarName]} ./test/)
+                    dependencyFileName=$(find_files_by_dependency_type ${dependencyTypeLookup[$dependencyVarName]} ./test/)
                 # TODO: add validation to check it not being empty
                 scanAndFollowDependencies "$dependencyFileName" "$(append_to_endpoint_info "$accumulator" "$dependencyMethod")"
             } ; done
