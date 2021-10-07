@@ -1,5 +1,25 @@
 #!/bin/bash
 
+
+function isPostgreContextFile {
+    local filePath=$1
+    grep -woPq '(?<=public class )\w+(?= \: DbContext)' "$filePath"
+
+    [[ $? -eq 0 ]] && echo 0 || echo 1
+}
+
+function isMongoContextFile {
+    local filePath=$1
+
+    grep -woPq 'public class [^I\s]\w+(?= : \w+)' "$filePath"
+    local isNotInterface=$?
+    
+    grep -woPq 'public IMongoCollection<BsonDocument> \w+ { get\; set\; }' "$filePath"
+    local containsMongoCollection=$?
+
+    [[ $isNotInterface -eq 0 && $containsMongoCollection -eq 0 ]] && echo 0 || echo 1
+}
+
 function methodBlock {
     local methodNamePattern=$1
     
