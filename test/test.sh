@@ -34,11 +34,19 @@ function getMongoContextName {
 
 # If the name is empty, consider error?
 # It shouldn't be possible.
-function determineDBContextType {
+function determineDBContextName {
     local filePath=$1
 
     [[ $(isPostgreContextFile $filePath) -eq 0 ]] && getPostgreContextName $filePath && return 0
     [[ $(isMongoContextFile $filePath) -eq 0 ]] && getMongoContextName $filePath && return 0
+    # TODO: Add DynamoDB indentifier (if possible)
+}
+
+function determineDBContextType {
+    local filePath=$1
+
+    [[ $(isPostgreContextFile $filePath) -eq 0 ]] && echo 'PostgreSQL' && return 0
+    [[ $(isMongoContextFile $filePath) -eq 0 ]] && echo 'MongoDB' && return 0
     # TODO: Add DynamoDB indentifier (if possible)
 }
 
@@ -130,11 +138,9 @@ methodBlock='\([^\(\)]*\)(\s+)\{[\s\S]+?\1\}'
 methodSig='\s+(?:(?:public|static|private) )+\S+\?? \w+'
 
 function scanAndFollowDependencies {
-    # If not controller, then use 2nd var 
     local scannedFile=$1
-    # Only present when its not a root of the call chain
     local accumulator=$2
-    # echo $scannedFile
+    echo -e "\nAcc: $accumulator"
 
     if [ -z "$scannedFile" ]
     then
@@ -150,7 +156,6 @@ function scanAndFollowDependencies {
     local dependencyVariablesSearchPattern=$(grep -oP -e "$dependencyVariablePattern" $scannedFile | \
         tr '\n' '|' | sed -E 's/\|$//g' )
     
-
     # local by default
     eval "declare -A dependencyTypeLookup=($(\
         grep -oP "private(?: readonly)? \K\w+ \w+(?=\;)" $scannedFile | \
@@ -172,25 +177,18 @@ function scanAndFollowDependencies {
         perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<Route: $controllerRoute\/\2! Type: \1! Name: \3! CallChain: \3!>/gm; s/R: .+?\K\/\/(?=[^!]+!)/\//gm" | \
         grep -oP '<[^<>]+>' | \
         while read endpointInfo ; do {
-            # echo -e "\n$endpointInfo"
             endpointName=$( echo $endpointInfo | grep -oP '(?<=Name: )\w+' )
-            # echo $endpointName
-
             pcregrep -M "(?:\[[^\[\]]+\]\s+)+public \S+ $endpointName\b(?! : Controller\n)$methodBlock" $scannedFile | \
             grep -oP "(?>(?:$dependencyVariablesSearchPattern)\.\w+)(?!\.)" | while read dependencyCall ; do {
-                # echo $dependencyCall
                 dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
                 
                 #--------------------------Test--------------------
                 if [[ $dependencyMethod == "ExecutePost" ]]
                 then
-                dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
-
-                # uc implementing interface, HARDCODED start directory
-                    dependencyFileName=$(find_files_by_dependency_type ${dependencyTypeLookup[$dependencyVarName]} ./test/)
-
                     local newAcc=$(append_to_endpoint_info "$endpointInfo" "$dependencyMethod")
-
+                    
+                dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
+                    dependencyFileName=$(find_files_by_dependency_type ${dependencyTypeLookup[$dependencyVarName]} ./test/)
                     scanAndFollowDependencies "$dependencyFileName" "$newAcc"
                 else
                     echo "Skip"
@@ -200,14 +198,21 @@ function scanAndFollowDependencies {
             } ; done
         } ; done
     else
-        # apply inner file calls
-        echo UC GW, etc.
         local calledMethod=$(echo $accumulator | grep -oP '(?<= )\w+(?=!\>)')
 
         # methodSignature --> problem I don't have $usecaseMethod in this context!!!!!!!! Need an extra var in the function
         # Make "methodSignature" into a functino that accepts a name
+
+        local calledMethodBlock=$(pcregrep -M "$(methodBlock $calledMethod)" $scannedFile)
+
+        if [ -z "$calledMethodBlock" ]
+        then
+            determineDBContextType $scannedFile
+            determineDBContextName $scannedFile
+            # If the values are non-empty, the send them, else return 1 & end execution branch
+        else
+            echo "$calledMethodBlock" | \
             grep -oP "(?>(?:$dependencyVariablesSearchPattern)\.\w+)(?!\.)" | while read dependencyCall ; do {
-                # I don't think I'll use the method
                 dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
                 dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
 
@@ -215,12 +220,13 @@ function scanAndFollowDependencies {
                 # TODO: add validation to check it not being empty
                 scanAndFollowDependencies "$dependencyFileName" "$(append_to_endpoint_info "$accumulator" "$dependencyMethod")"
             } ; done
-
+        fi        
     fi
 }
-scanAndFollowDependencies ./test/controller.txt
-
-scanAndFollowDependencies ./test/controller1.txt
 
 scanAndFollowDependencies ./test/controller.txt
+
+# isPostgreContextFile ./test/databaseContextPostgre.txt
+
+#mongoContext
 
