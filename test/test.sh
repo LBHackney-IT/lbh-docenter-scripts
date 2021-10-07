@@ -1,6 +1,7 @@
 #!/bin/bash
 
 
+# Should also probs look for Npgsql import - it might be smth else like MySQL
 function isPostgreContextFile {
     local filePath=$1
     grep -woPq '(?<=public class )\w+(?= \: DbContext)' "$filePath"
@@ -8,6 +9,12 @@ function isPostgreContextFile {
     [[ $? -eq 0 ]] && echo 0 || echo 1
 }
 
+function getPostgreContextName {
+    local filePath=$1
+    grep -woP '(?<=public class )\w+(?= \: DbContext)' "$filePath"
+}
+
+# Could also search "IMongoDatabase", which is part of Mongo Driver I assume.
 function isMongoContextFile {
     local filePath=$1
 
@@ -18,6 +25,21 @@ function isMongoContextFile {
     local containsMongoCollection=$?
 
     [[ $isNotInterface -eq 0 && $containsMongoCollection -eq 0 ]] && echo 0 || echo 1
+}
+
+function getMongoContextName {
+    local filePath=$1
+    grep -woP '(?<=public class )\w+(?= : \w+)' "$filePath"
+}
+
+# If the name is empty, consider error?
+# It shouldn't be possible.
+function determineDBContextType {
+    local filePath=$1
+
+    [[ $(isPostgreContextFile $filePath) -eq 0 ]] && getPostgreContextName $filePath && return 0
+    [[ $(isMongoContextFile $filePath) -eq 0 ]] && getMongoContextName $filePath && return 0
+    # TODO: Add DynamoDB indentifier (if possible)
 }
 
 function methodBlock {
