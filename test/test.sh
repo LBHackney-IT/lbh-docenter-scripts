@@ -73,6 +73,11 @@ function fileMethodNamesPattern {
 
 # Might be overkill, but it's best to make sure
 # That the calls are to the local scope functions
+# This has a weakness of that the following pattern won't match:
+# LegitMethodNameThatWontMatch(StaticClass.AnyMethod())
+# It won't match, because we have braces within braces. The "AnyMethod" will
+# match instead of the desired one... need some OR magic to resolve this.
+# It's low priority right now bcz it's a super rare case.
 function fileMethodCallsWithinMethodPattern {
     local fileName=$1
     echo "(?<![\w>?] )$(fileMethodNamesPattern $fileName)(?=\((?:[^\(\)]+)?\))"
@@ -134,103 +139,72 @@ function find_files_by_dependency_type {
 
 endpointMetadata='(?:\[[^\[\]]+\]\s+)+public \S+ \w+\b(?! : Controller\n)'
 methodBlock='\([^\(\)]*\)(\s+)\{[\s\S]+?\1\}'
-methodSig='\s+(?:(?:public|static|private) )+\S+\?? \w+'
+# methodSig='\n\s+(?>(?:public|static|private) )+\S+\?? \w+'
 
 function scanAndFollowDependencies {
     local scannedFile=$1
     local accumulator=$2
-    echo -e "\nAcc: $accumulator"
 
     if [ -z "$scannedFile" ]
     then
-        # temporary silly resolution for the base case
-        # TODO: implement some accumulator? And then compact its data
-        # could be  <R: /v1/*; T: Get; N: GetWorkerById; CallChain: UCMethod1, UCMethod2, GWMethod1, DBContext1; DBContext2>
-        # Could maybe even include the DBContext collection name or smth.
-        # Call chain could become useful later down the line
-        echo "Base Case!"
-        exit 0
+        # temporary silly resolution for the base problem case like validator, etc.
+        echo "Dead End Case!"
+        return 1
     fi
 
     local dependencyVariablesSearchPattern=$(grep -oP -e "$dependencyVariablePattern" $scannedFile | \
         tr '\n' '|' | sed -E 's/\|$//g' )
     
-    # local by default
     eval "declare -A dependencyTypeLookup=($(\
         grep -oP "private(?: readonly)? \K\w+ \w+(?=\;)" $scannedFile | \
         sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
         tr '\n' ' '))"
     
-    
-    # for x in "${!dependencyTypeLookup[@]}"; do printf "[%s]=%s\n" "$x" "${dependencyTypeLookup[$x]}" ; done
-
-
     (grep -wq ": Controller" $scannedFile)
     local isController=$?
     
     # You can instead just set variables for patterns within this block, rather than do all this heavy logic
     if [[ $isController -ne 1 ]]; then
-        local controllerRoute=$(get_controller_route $scannedFile | sed -E 's/\//\\\//g')
-
-        pcregrep -M "$endpointMetadata" $scannedFile | \
-        perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<Route: $controllerRoute\/\2! Type: \1! Name: \3! CallChain: \3!>/gm; s/R: .+?\K\/\/(?=[^!]+!)/\//gm" | \
-        grep -oP '<[^<>]+>' | \
-        while read endpointInfo ; do {
-            endpointName=$( echo $endpointInfo | grep -oP '(?<=Name: )\w+' )
-            pcregrep -M "(?:\[[^\[\]]+\]\s+)+public \S+ $endpointName\b(?! : Controller\n)$methodBlock" $scannedFile | \
-            grep -oP "(?>(?:$dependencyVariablesSearchPattern)\.\w+)(?!\.)" | while read dependencyCall ; do {
-                dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
-                
-                #--------------------------Test--------------------
-                if [[ $dependencyMethod == "ExecuteGet" ]]
-                then
-                    local newAcc=$(append_to_endpoint_info "$endpointInfo" "$dependencyMethod")
-                    
-                dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
-                    dependencyFileName=$(find_files_by_dependency_type ${dependencyTypeLookup[$dependencyVarName]} ./test/)
-                    scanAndFollowDependencies "$dependencyFileName" "$newAcc"
+        local targetMethod=$( echo $accumulator | grep -oP '(?<=Name: )\w+' )
+        local targetMethodBlock=$(pcregrep -M "$(methodBlock $targetMethod)" $scannedFile)
                 else
-                    echo "Skip"
+        local targetMethod=$(echo $accumulator | grep -oP '(?<= )\w+(?=!\>)')
+        local targetMethodBlock=$(pcregrep -M "$(methodBlock $targetMethod)" $scannedFile)
                 fi
-                #------------------------End-Test--------------------
 
-            } ; done
-        } ; done
-    else
-        local calledMethod=$(echo $accumulator | grep -oP '(?<= )\w+(?=!\>)')
-
-        # methodSignature --> problem I don't have $usecaseMethod in this context!!!!!!!! Need an extra var in the function
-        # Make "methodSignature" into a functino that accepts a name
-
-        local calledMethodBlock=$(pcregrep -M "$(methodBlock $calledMethod)" $scannedFile)
-
-        if [ -z "$calledMethodBlock" ]
+    if [ -z "$targetMethodBlock" ]
         then
             determineDBContextType $scannedFile
             determineDBContextName $scannedFile
             # If the values are non-empty, the send them, else return 1 & end execution branch
         else
-            getFileScopeMethodCallsWithinMethod $calledMethod $scannedFile | while read localCall ; do {
-                fileMethodCallsWithinMethodPattern $scannedFile
+        getFileScopeMethodCallsWithinMethod $targetMethod $scannedFile | while read localCall ; do {
                 scanAndFollowDependencies "$scannedFile" "$(append_to_endpoint_info "$accumulator" "$localCall")"
             } ; done
             
             # Identify dependency calls within this file to another file - call
             # Shouldn't exclude double calls as that's what leads to dbcontext when no changes are saved, but instead retrieved
-            echo "$calledMethodBlock" | \
+        echo "$targetMethodBlock" | \
             grep -oP "(?>(?:$dependencyVariablesSearchPattern)\.\w+)" | while read dependencyCall ; do {
                 dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
                 dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
-
                     dependencyFileName=$(find_files_by_dependency_type ${dependencyTypeLookup[$dependencyVarName]} ./test/)
-                # TODO: add validation to check it not being empty
                 scanAndFollowDependencies "$dependencyFileName" "$(append_to_endpoint_info "$accumulator" "$dependencyMethod")"
             } ; done
         fi        
-    fi
 }
 
-scanAndFollowDependencies ./test/controller.txt
+controllerFile="./test/controller.txt"
+
+controllerRoute=$(get_controller_route $controllerFile | sed -E 's/\//\\\//g')
+
+pcregrep -M "$endpointMetadata" $controllerFile | \
+perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<Route: $controllerRoute\/\2! Type: \1! Name: \3! CallChain: \3!>/gm; s/R: .+?\K\/\/(?=[^!]+!)/\//gm" | \
+grep -oP '<[^<>]+>' | while read endpointInfo ; do {
+    # echo $endpointInfo
+    scanAndFollowDependencies "$controllerFile" "$endpointInfo"
+} ; done
+
 
 # isPostgreContextFile ./test/databaseContextPostgre.txt
 
