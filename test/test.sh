@@ -61,8 +61,7 @@ function methodBlock {
     echo "\n\s+(?>(?:public|static|private) )+\S+\?? $methodNamePattern\([^\(\)]*\)(\s+)\{[\s\S]+?\1\}"
 }
 
-
-methodSignature='(?:(?:public|static|private) )+\S+\?? \w+\((?:[^\(\)]+)?\)'
+methodSignature='\n\s+(?>(?:public|static|private) )+\S+\?? \w+\([^\(\)]*\)'
 
 function fileMethodNamesPattern {
     local fileName=$1
@@ -76,7 +75,7 @@ function fileMethodNamesPattern {
 # That the calls are to the local scope functions
 function fileMethodCallsWithinMethodPattern {
     local fileName=$1
-    echo "(?<!public)(?<!static)(?<!private) \S+\?? \K$(fileMethodNamesPattern $fileName)(?=\((?:[^\(\)]+)?\))"
+    echo "(?<![\w>] )$(fileMethodNamesPattern $fileName)(?=\((?:[^\(\)]+)?\))"
 }
 
 function getFileScopeMethodCallsWithinMethod {
