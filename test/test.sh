@@ -182,7 +182,7 @@ function scanAndFollowDependencies {
                 dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
                 
                 #--------------------------Test--------------------
-                if [[ $dependencyMethod == "ExecutePost" ]]
+                if [[ $dependencyMethod == "ExecuteGet" ]]
                 then
                     local newAcc=$(append_to_endpoint_info "$endpointInfo" "$dependencyMethod")
                     
@@ -210,8 +210,15 @@ function scanAndFollowDependencies {
             determineDBContextName $scannedFile
             # If the values are non-empty, the send them, else return 1 & end execution branch
         else
+            getFileScopeMethodCallsWithinMethod $calledMethod $scannedFile | while read localCall ; do {
+                fileMethodCallsWithinMethodPattern $scannedFile
+                scanAndFollowDependencies "$scannedFile" "$(append_to_endpoint_info "$accumulator" "$localCall")"
+            } ; done
+            
+            # Identify dependency calls within this file to another file - call
+            # Shouldn't exclude double calls as that's what leads to dbcontext when no changes are saved, but instead retrieved
             echo "$calledMethodBlock" | \
-            grep -oP "(?>(?:$dependencyVariablesSearchPattern)\.\w+)(?!\.)" | while read dependencyCall ; do {
+            grep -oP "(?>(?:$dependencyVariablesSearchPattern)\.\w+)" | while read dependencyCall ; do {
                 dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
                 dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
 
