@@ -174,9 +174,12 @@ function scanAndFollowDependencies {
 
     if [ -z "$targetMethodBlock" ]
         then
-            determineDBContextType $scannedFile
-            determineDBContextName $scannedFile
-            # If the values are non-empty, the send them, else return 1 & end execution branch
+        local dbType=$(determineDBContextType $scannedFile)
+        local dbName=$(determineDBContextName $scannedFile)
+
+        [[ -z "$dbType" && -z "$dbName" ]] && return 1
+        # If the values are non-empty, then combine them with endpoint info & send them, else return 1 & end execution branch
+        # TODO: Construct a single inline string. Not sure if I want yet another dependency (jq)
         else
         getFileScopeMethodCallsWithinMethod $targetMethod $scannedFile | while read localCall ; do {
                 scanAndFollowDependencies "$scannedFile" "$(append_to_endpoint_info "$accumulator" "$localCall")"
@@ -188,6 +191,7 @@ function scanAndFollowDependencies {
             grep -oP "(?>(?:$dependencyVariablesSearchPattern)\.\w+)" | while read dependencyCall ; do {
                 dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
                 dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
+            # Replace test directory with the API directory
                     dependencyFileName=$(find_files_by_dependency_type ${dependencyTypeLookup[$dependencyVarName]} ./test/)
                 scanAndFollowDependencies "$dependencyFileName" "$(append_to_endpoint_info "$accumulator" "$dependencyMethod")"
             } ; done
@@ -201,7 +205,6 @@ controllerRoute=$(get_controller_route $controllerFile | sed -E 's/\//\\\//g')
 pcregrep -M "$endpointMetadata" $controllerFile | \
 perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<Route: $controllerRoute\/\2! Type: \1! Name: \3! CallChain: \3!>/gm; s/R: .+?\K\/\/(?=[^!]+!)/\//gm" | \
 grep -oP '<[^<>]+>' | while read endpointInfo ; do {
-    # echo $endpointInfo
     scanAndFollowDependencies "$controllerFile" "$endpointInfo"
 } ; done
 
