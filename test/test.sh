@@ -178,8 +178,11 @@ function scanAndFollowDependencies {
         local dbName=$(determineDBContextName $scannedFile)
 
         [[ -z "$dbType" && -z "$dbName" ]] && return 1
-        # If the values are non-empty, then combine them with endpoint info & send them, else return 1 & end execution branch
-        # TODO: Construct a single inline string. Not sure if I want yet another dependency (jq)
+        # Extract this into a function
+        local eName=$(echo "$accumulator" | grep -oP '(?<=Name: )\w+(?=\!)')
+        local eRoute=$(echo "$accumulator" | grep -oP '(?<=Route: ).+?(?=\!)')
+        local eType=$(echo "$accumulator" | grep -oP '(?<=Type: )\w+(?=\!)')
+        echo "<DbName: $dbName! DbType: $dbType! Name: $eName! Type: $eType! Route: $eRoute!>"
         else
         getFileScopeMethodCallsWithinMethod $targetMethod $scannedFile | while read localCall ; do {
                 scanAndFollowDependencies "$scannedFile" "$(append_to_endpoint_info "$accumulator" "$localCall")"
