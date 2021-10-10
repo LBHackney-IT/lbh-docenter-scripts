@@ -80,7 +80,7 @@ function fileMethodNamesPattern {
 # It's low priority right now bcz it's a super rare case.
 function fileMethodCallsWithinMethodPattern {
     local fileName=$1
-    echo "(?<![\w>?] )$(fileMethodNamesPattern $fileName)(?=\((?:[^\(\)]+)?\))"
+    echo "(?<![\w>?] )\b$(fileMethodNamesPattern $fileName)(?=\((?:[^\(\)]+)?\))"
 }
 
 function getFileScopeMethodCallsWithinMethod {
