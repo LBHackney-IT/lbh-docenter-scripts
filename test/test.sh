@@ -66,7 +66,7 @@ methodSignature='\n\s+(?>(?:public|static|private) )+\S+\?? \w+\([^\(\)]*\)'
 function fileMethodNamesPattern {
     local fileName=$1
     pcregrep -M "$methodSignature" $fileName | \
-    grep -oP '\w+(?=\s*\([^\(\)]*\))' | \
+    grep -oP '(?<!\[)\b\w+(?=\s*\([^\(\)]*\))' | \
     tr '\n' '|' | \
     sed -E 's/\|$//g;s/(.+)/\(\?:\1\)/'
 }
