@@ -1,5 +1,40 @@
 #!/bin/bash
 
+projectDirectory='./social-care-case-viewer-api/'
+# No need to search the project root or tests project
+apiProjectDirectory=$( find $projectDirectory -mindepth 1 -type d -iname '*Api' )
+function find_files_using_interface {
+    local interface=$1
+    local startDirectory=$2
+    # [ -z "$interface" ] && { echo "Interface is empty!"; return 1; }
+    grep -rlwE $startDirectory -e "public class \w+ : $interface"
+}
+
+function find_files_using_class {
+    local class=$1
+    local startDirectory=$2
+    # Not convinced on the value of exit codes yet
+    grep -rlwE $startDirectory -e "public class $class : \w+"
+}
+
+# There should be only one file that contains the dependency method
+# from the call
+function find_files_by_dependency_type {
+    local dataType=$1
+    local startDirectory=$2
+    local dependencyFile=$(find_files_using_interface $dataType $startDirectory)
+    if [ -z "$dependencyFile" ]
+    then
+        dependencyFile=$(find_files_using_class $dataType $startDirectory)
+    fi
+    echo $dependencyFile
+}
+
+# Creating a partially applied function (like in Haskell)
+function find_dependency_file_name_in_api_directory {
+    local dataType=$1
+    find_files_by_dependency_type "$dataType" "$apiProjectDirectory"
+}
 
 # Should also probs look for Npgsql import - it might be smth else like MySQL
 function isPostgreContextFile {
@@ -107,37 +142,12 @@ function get_controller_route {
     grep -oP '\[Route\(\"\K[^"]+(?=\"\)\])'
 }
 
-function find_files_using_interface {
-    local interface=$1
-    # apiProjectDirectory
-    local startDirectory=$2
-
-    [ -z "$interface" ] && { echo "Interface is empty!"; exit 1; }
-
-    grep -rlwE $startDirectory -e "public class \w+ : $interface"
-}
-
-function find_files_using_class {
-    local class=$1
-    local startDirectory=$2
-    # Not convinced on the value of exit codes yet
-    grep -rlwE $startDirectory -e "public class $class : \w+"
-}
-
-# There should be only one file that contains the dependency method
-# from the call
-function find_files_by_dependency_type {
-    local dataType=$1
-    local startDirectory=$2
-    local dependencyFile=$(find_files_using_interface $dataType $startDirectory)
-    if [ -z "$dependencyFile" ]
-    then
-        dependencyFile=$(find_files_using_class $dataType $startDirectory)
-    fi
-    echo $dependencyFile
-}
+# local dependenciesName="$(get_file_class $scannedFile)DependencyLookup"
+# eval "echo !$dependenciesName[@]"
+# for x in $(eval "echo !$dependenciesName[@]"); do printf "[%s]=%s\n" "$x" "${dependenciesName[$x]}" ; done
 
 endpointMetadata='(?:\[[^\[\]]+\]\s+)+public \S+ \w+\b(?! : Controller\n)'
+# block='(\s+)\{[\s\S]+?\1\}'
 methodBlock='\([^\(\)]*\)(\s+)\{[\s\S]+?\1\}'
 # methodSig='\n\s+(?>(?:public|static|private) )+\S+\?? \w+'
 
@@ -195,7 +205,7 @@ function scanAndFollowDependencies {
                 dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
                 dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
             # Replace test directory with the API directory
-                    dependencyFileName=$(find_files_by_dependency_type ${dependencyTypeLookup[$dependencyVarName]} ./test/)
+            dependencyFileName=$(find_dependency_file_name_in_api_directory "${dependencyTypeLookup[$dependencyVarName]}")
                 scanAndFollowDependencies "$dependencyFileName" "$(append_to_endpoint_info "$accumulator" "$dependencyMethod")"
             } ; done
         fi        
