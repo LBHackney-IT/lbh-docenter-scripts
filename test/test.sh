@@ -93,10 +93,10 @@ function methodBlock {
         methodNamePattern='\w+'
     fi
 
-    echo "\n\s+(?>(?:public|static|private) )+\S+\?? $methodNamePattern\([^\(\)]*\)(\s+)\{[\s\S]+?\1\}"
+    echo "\n\s+(?>(?:public|static|private) )+(?:async )?\S+\?? $methodNamePattern\([^\(\)]*\)(\s+)\{[\s\S]+?\1\}"
 }
 
-methodSignature='\n\s+(?>(?:public|static|private) )+\S+\?? \w+\([^\(\)]*\)'
+methodSignature='\n\s+(?>(?:public|static|private) )+(?:async )?\S+\?? \w+\([^\(\)]*\)'
 
 function fileMethodNamesPattern {
     local fileName=$1
@@ -146,7 +146,7 @@ function get_controller_route {
 # eval "echo !$dependenciesName[@]"
 # for x in $(eval "echo !$dependenciesName[@]"); do printf "[%s]=%s\n" "$x" "${dependenciesName[$x]}" ; done
 
-endpointMetadata='(?:\[[^\[\]]+\]\s+)+public \S+ \w+\b(?! : Controller\n)'
+endpointMetadata='(?:\[[^\[\]]+\]\s+)+public (?:async )?\S+ \w+\b(?! : Controller\n)'
 # block='(\s+)\{[\s\S]+?\1\}'
 methodBlock='\([^\(\)]*\)(\s+)\{[\s\S]+?\1\}'
 # methodSig='\n\s+(?>(?:public|static|private) )+\S+\?? \w+'
@@ -217,7 +217,7 @@ for controllerFile in $controllersList
 do
     controllerRoute=$(get_controller_route "$controllerFile" | sed -E 's/\//\\\//g')
 pcregrep -M "$endpointMetadata" $controllerFile | \
-perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<Route: $controllerRoute\/\2! Type: \1! Name: \3! CallChain: \3!>/gm; s/R: .+?\K\/\/(?=[^!]+!)/\//gm" | \
+    perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public (?:async )?\S+ (\w+)/<Route: $controllerRoute\/\2! Type: \1! Name: \3! CallChain: \3!>/gm; s/R: .+?\K\/\/(?=[^!]+!)/\//gm" | \
 grep -oP '<[^<>]+>' | while read endpointInfo ; do {
     scanAndFollowDependencies "$controllerFile" "$endpointInfo"
 } ; done
