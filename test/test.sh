@@ -211,15 +211,17 @@ function scanAndFollowDependencies {
         fi        
 }
 
-controllerFile="./test/controller.txt"
+controllersList=$(find "$apiProjectDirectory/V1/Controllers" -mindepth 1)
 
-controllerRoute=$(get_controller_route $controllerFile | sed -E 's/\//\\\//g')
-
+for controllerFile in $controllersList
+do
+    controllerRoute=$(get_controller_route "$controllerFile" | sed -E 's/\//\\\//g')
 pcregrep -M "$endpointMetadata" $controllerFile | \
 perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public \S+ (\w+)/<Route: $controllerRoute\/\2! Type: \1! Name: \3! CallChain: \3!>/gm; s/R: .+?\K\/\/(?=[^!]+!)/\//gm" | \
 grep -oP '<[^<>]+>' | while read endpointInfo ; do {
     scanAndFollowDependencies "$controllerFile" "$endpointInfo"
 } ; done
+done
 
 
 # isPostgreContextFile ./test/databaseContextPostgre.txt
