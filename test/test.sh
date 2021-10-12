@@ -170,6 +170,8 @@ function scanAndFollowDependencies {
         sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
         tr '\n' ' '))"
     
+    local dependencyCount=${#dependencyTypeLookup[@]}
+
     (grep -wq ": Controller" $scannedFile)
     local isController=$?
     
@@ -182,7 +184,7 @@ function scanAndFollowDependencies {
         local targetMethodBlock=$(pcregrep -M "$(methodBlock $targetMethod)" $scannedFile)
                 fi
 
-    if [ -z "$targetMethodBlock" ]
+    if [[ -z "$targetMethodBlock" || $dependencyCount -eq 0 ]]
         then
         local dbType=$(determineDBContextType $scannedFile)
         local dbName=$(determineDBContextName $scannedFile)
