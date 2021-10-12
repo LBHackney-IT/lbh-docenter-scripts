@@ -1,8 +1,11 @@
 #!/bin/bash
 
+echo "Start!"
+
 projectDirectory='./social-care-case-viewer-api/'
 # No need to search the project root or tests project
 apiProjectDirectory=$( find $projectDirectory -mindepth 1 -type d -iname '*Api' )
+
 function find_files_using_interface {
     local interface=$1
     local startDirectory=$2
@@ -125,9 +128,6 @@ function getFileScopeMethodCallsWithinMethod {
     grep -oP "$(fileMethodCallsWithinMethodPattern $filePath)" 
 }
 
-
-echo "Start!"
-
 dependencyVariablePattern='private(?: readonly)? \K\w+ \K\w+(?=;)'
 
 function append_to_endpoint_info {
@@ -141,10 +141,6 @@ function get_controller_route {
     pcregrep -oM '\[Route\(\"[^"]+\"\)\][\S\s]+public class \w+ : Controller' $controllerFilePath |
     grep -oP '\[Route\(\"\K[^"]+(?=\"\)\])'
 }
-
-# local dependenciesName="$(get_file_class $scannedFile)DependencyLookup"
-# eval "echo !$dependenciesName[@]"
-# for x in $(eval "echo !$dependenciesName[@]"); do printf "[%s]=%s\n" "$x" "${dependenciesName[$x]}" ; done
 
 endpointMetadata='(?:\[[^\[\]]+\]\s+)+public (?:async )?\S+ \w+\b(?! : Controller\n)'
 # block='(\s+)\{[\s\S]+?\1\}'
@@ -169,64 +165,82 @@ function scanAndFollowDependencies {
         grep -oP "private(?: readonly)? \K\w+ \w+(?=\;)" $scannedFile | \
         sed -E 's/(\w+)\s(\w+)/\[\2\]=\1/g' | \
         tr '\n' ' '))"
-    
+
+
     local dependencyCount=${#dependencyTypeLookup[@]}
 
     (grep -wq ": Controller" $scannedFile)
     local isController=$?
     
-    # You can instead just set variables for patterns within this block, rather than do all this heavy logic
     if [[ $isController -ne 1 ]]; then
         local targetMethod=$( echo $accumulator | grep -oP '(?<=Name: )\w+' )
         local targetMethodBlock=$(pcregrep -M "$(methodBlock $targetMethod)" $scannedFile)
-                else
+    else
         local targetMethod=$(echo $accumulator | grep -oP '(?<= )\w+(?=!\>)')
         local targetMethodBlock=$(pcregrep -M "$(methodBlock $targetMethod)" $scannedFile)
-                fi
+    fi
 
     if [[ -z "$targetMethodBlock" || $dependencyCount -eq 0 ]]
-        then
+    then
         local dbType=$(determineDBContextType $scannedFile)
         local dbName=$(determineDBContextName $scannedFile)
 
         [[ -z "$dbType" && -z "$dbName" ]] && return 1
-        # Extract this into a function
+
+        # TODO: Extract this into a function
         local eName=$(echo "$accumulator" | grep -oP '(?<=Name: )\w+(?=\!)')
         local eRoute=$(echo "$accumulator" | grep -oP '(?<=Route: ).+?(?=\!)')
         local eType=$(echo "$accumulator" | grep -oP '(?<=Type: )\w+(?=\!)')
-        echo "<DbName: $dbName! DbType: $dbType! Name: $eName! Type: $eType! Route: $eRoute!>"
-        else
+        echo "<DbName: $dbName! DbType: $dbType! Name: $eName! Type: $eType! Route: $eRoute!> $accumulator"
+    else
         getFileScopeMethodCallsWithinMethod $targetMethod $scannedFile | while read localCall ; do {
-                scanAndFollowDependencies "$scannedFile" "$(append_to_endpoint_info "$accumulator" "$localCall")"
-            } ; done
-            
-            # Identify dependency calls within this file to another file - call
-            # Shouldn't exclude double calls as that's what leads to dbcontext when no changes are saved, but instead retrieved
+            scanAndFollowDependencies "$scannedFile" "$(append_to_endpoint_info "$accumulator" "$localCall")"
+        } ; done
+
         echo "$targetMethodBlock" | \
-            grep -oP "(?>(?:$dependencyVariablesSearchPattern)\.\w+)" | while read dependencyCall ; do {
-                dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')
-                dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
-            # Replace test directory with the API directory
+        grep -oP "(?>(?:$dependencyVariablesSearchPattern)\.\w+)" | while read dependencyCall ; do {                
+            # There should also be a part that determines the type of the input & output objects, but that skyrockets the complexity of
+            # the script & hence should be done as separate PR. Luckily this is only important for dis-ambiguing the C# method overloads,
+            # which tend to get used quite rarely, so it doesn't affect the accuracy of the output too much.
+            dependencyMethod=$(echo "$dependencyCall" | grep -oP '\.\K\w+')    
+            dependencyVarName=$(echo "$dependencyCall" | grep -oP '\w+(?=\.)')
             dependencyFileName=$(find_dependency_file_name_in_api_directory "${dependencyTypeLookup[$dependencyVarName]}")
-                scanAndFollowDependencies "$dependencyFileName" "$(append_to_endpoint_info "$accumulator" "$dependencyMethod")"
-            } ; done
-        fi        
+            scanAndFollowDependencies "$dependencyFileName" "$(append_to_endpoint_info "$accumulator" "$dependencyMethod")"
+        } ; done
+    fi
 }
 
 controllersList=$(find "$apiProjectDirectory/V1/Controllers" -mindepth 1)
 
+# Need to also search "IMongoDatabase", which is part of Mongo Driver I assume.
+# Seems, there are a couple ways of implementing the MongoDB
 for controllerFile in $controllersList
 do
     controllerRoute=$(get_controller_route "$controllerFile" | sed -E 's/\//\\\//g')
-pcregrep -M "$endpointMetadata" $controllerFile | \
+    pcregrep -M "$endpointMetadata" $controllerFile | \
     perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public (?:async )?\S+ (\w+)/<Route: $controllerRoute\/\2! Type: \1! Name: \3! CallChain: \3!>/gm; s/R: .+?\K\/\/(?=[^!]+!)/\//gm" | \
-grep -oP '<[^<>]+>' | while read endpointInfo ; do {
-    scanAndFollowDependencies "$controllerFile" "$endpointInfo"
-} ; done
+    grep -oP '<[^<>]+>' | while read endpointInfo ; do {
+        scanAndFollowDependencies "$controllerFile" "$endpointInfo" | sort -u
+    } ; done
 done
 
+# You can do the grouping by making a db combination a capture group & the find all the results with that capture group
 
-# isPostgreContextFile ./test/databaseContextPostgre.txt
 
-#mongoContext
 
+
+#---------------------------------------------------TEST----------------------------------------------------------------------------
+
+# file="./social-care-case-viewer-api/SocialCareCaseViewerApi/V1/Controllers/CaseController.cs"
+# controllerRoute=$(get_controller_route "$file" | sed -E 's/\//\\\//g')
+
+# # echo "R: $controllerRoute"
+# pcregrep -M "$endpointMetadata" $file | \
+# perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public (?:async )?\S+ (\w+)/<Route: $controllerRoute\/\2! Type: \1! Name: \3! CallChain: \3!>/gm; s/R: .+?\K\/\/(?=[^!]+!)/\//gm" | \
+# grep -oP '<[^<>]+>' | while read endpointInfo ; do {
+#     echo "S----------------------------------------------"
+#     # echo "$endpointInfo"
+#     scanAndFollowDependencies "$file" "$endpointInfo" | sort -u
+#     echo "E----------------------------------------------"
+#     # | sort -u
+# } ; done
