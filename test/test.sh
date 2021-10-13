@@ -191,7 +191,7 @@ function scanAndFollowDependencies {
         local eName=$(echo "$accumulator" | grep -oP '(?<=Name: )\w+(?=\!)')
         local eRoute=$(echo "$accumulator" | grep -oP '(?<=Route: ).+?(?=\!)')
         local eType=$(echo "$accumulator" | grep -oP '(?<=Type: )\w+(?=\!)')
-        echo "<DbName: $dbName! DbType: $dbType! Name: $eName! Type: $eType! Route: $eRoute!> $accumulator"
+        echo "<DbName: $dbName! DbType: $dbType! Name: $eName! Type: $eType! Route: $eRoute!>"
     else
         getFileScopeMethodCallsWithinMethod $targetMethod $scannedFile | while read localCall ; do {
             scanAndFollowDependencies "$scannedFile" "$(append_to_endpoint_info "$accumulator" "$localCall")"
@@ -220,9 +220,17 @@ do
     pcregrep -M "$endpointMetadata" $controllerFile | \
     perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public (?:async )?\S+ (\w+)/<Route: $controllerRoute\/\2! Type: \1! Name: \3! CallChain: \3!>/gm; s/R: .+?\K\/\/(?=[^!]+!)/\//gm" | \
     grep -oP '<[^<>]+>' | while read endpointInfo ; do {
-        scanAndFollowDependencies "$controllerFile" "$endpointInfo" | sort -u
+        scanAndFollowDependencies "$controllerFile" "$endpointInfo"
     } ; done
-done
+done | sort -u | {
+    IFS=''
+    read -r -d '' executionTreeOutput
+    IFS='\n'
+    
+    databases=$(echo -e "$executionTreeOutput" | grep -oP '<DbName: \w+! DbType: \w+!' | sort -u)
+    echo -e "$databases" | while read database ; do {
+        echo "INDV: $database"
+    } ; done
 
 # You can do the grouping by making a db combination a capture group & the find all the results with that capture group
 
