@@ -225,9 +225,14 @@ do
 done | sort -u | {
     IFS=''; read -r -d '' executionTreeOutput; IFS='\n';
     databases=$(echo -e "$executionTreeOutput" | grep -oP '<DbName: \w+! DbType: \w+!' | sort -u)
-    echo -e "$databases" | while read database ; do {
-        echo -e "$executionTreeOutput" | grep -P "^$database" | perl -pe 's/<.+?! Name: (\w+)! Type: (\w+)! Route: ([^!]+)!>/\{"name":"\1"\,"httpMethod":"\2","path":"\3"}/gm' | tr '\n' ',' | sed -E 's/,$/\n/'
-    } ; done
+    jsonDbDepObj=$(echo -e "$databases" | while read database ; do {
+        dbTechName=$(echo "$database" | grep -oP '(?<=DbName: )\w+(?=!)')
+        dbType=$(echo "$database" | grep -oP '(?<=DbType: )\w+(?=!)')
+        jsonEndpointsList=$(echo -e "$executionTreeOutput" | grep -P "^$database" | perl -pe 's/<.+?! Name: (\w+)! Type: (\w+)! Route: ([^!]+)!>/\{"name":"\1"\,"httpMethod":"\2","path":"\3"}/gm' | tr '\n' ',' | sed -E 's/,$//')
+        echo -e "{\"technicalName\":\"$dbTechName\",\"type\":\"$dbType\",\"endpointsUsingIt\":[$jsonEndpointsList]}"
+    } ; done | tr '\n' ',' | sed -E 's/,$//')
+    
+    dependenciesObject="{\"databases\":[$jsonDbDepObj]}"
 }
 
 # You can do the grouping by making a db combination a capture group & the find all the results with that capture group
