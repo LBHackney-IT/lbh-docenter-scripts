@@ -2,6 +2,7 @@
 
 echo "Start!"
 
+# Should be parameterized when in the pipeline
 projectDirectory='./social-care-case-viewer-api/'
 # No need to search the project root or tests project
 apiProjectDirectory=$( find $projectDirectory -mindepth 1 -type d -iname '*Api' )
@@ -189,7 +190,7 @@ function scanAndFollowDependencies {
         local eName=$(echo "$accumulator" | grep -oP '(?<=Name: )\w+(?=\!)')
         local eRoute=$(echo "$accumulator" | grep -oP '(?<=Route: ).+?(?=\!)')
         local eType=$(echo "$accumulator" | grep -oP '(?<=Type: )\w+(?=\!)')
-        echo "<DbName: $dbName! DbType: $dbType! Name: $eName! Type: $eType! Route: $eRoute!> $accumulator"
+        echo "<DbName: $dbName! DbType: $dbType! Name: $eName! Type: $eType! Route: $eRoute!>"
     else
         getFileScopeMethodCallsWithinMethod $targetMethod $scannedFile | while read localCall ; do {
             scanAndFollowDependencies "$scannedFile" "$(append_to_endpoint_info "$accumulator" "$localCall")"
@@ -216,9 +217,35 @@ do
     pcregrep -M "$endpointMetadata" $controllerFile | \
     perl -0777 -pe "s/(?:(?:\[Http(\w+)\]|\[Route\(\"([^\"]+)\"\)\]|(?:\[[^\[\]]+\]))\s+)+public (?:async )?\S+ (\w+)/<Route: $controllerRoute\/\2! Type: \1! Name: \3! CallChain: \3!>/gm; s/R: .+?\K\/\/(?=[^!]+!)/\//gm" | \
     grep -oP '<[^<>]+>' | while read endpointInfo ; do {
-        scanAndFollowDependencies "$controllerFile" "$endpointInfo" | sort -u
+        scanAndFollowDependencies "$controllerFile" "$endpointInfo"
     } ; done
-done
+done | sort -u | {
+    IFS=''; read -r -d '' executionTreeOutput; IFS='\n';
+    databases=$(echo -e "$executionTreeOutput" | grep -oP '<DbName: \w+! DbType: \w+!' | sort -u)
+    jsonDbDepObj=$(echo -e "$databases" | while read database ; do {
+        dbTechName=$(echo "$database" | grep -oP '(?<=DbName: )\w+(?=!)')
+        dbType=$(echo "$database" | grep -oP '(?<=DbType: )\w+(?=!)')
+        jsonEndpointsList=$(echo -e "$executionTreeOutput" | grep -P "^$database" | perl -pe 's/<.+?! Name: (\w+)! Type: (\w+)! Route: ([^!]+)!>/\{"name":"\1"\,"httpMethod":"\2","path":"\3"}/gm' | tr '\n' ',' | sed -E 's/,$//')
+        echo -e "{\"technicalName\":\"$dbTechName\",\"type\":\"$dbType\",\"endpointsUsingIt\":[$jsonEndpointsList]}"
+    } ; done | tr '\n' ',' | sed -E 's/,$//')
+    
+    dependenciesObject="{\"databases\":[$jsonDbDepObj]}"
+    ghPageUrl="https://github.com/LBHackney-IT/$CIRCLE_PROJECT_REPONAME"
+    projectName=$(echo "$CIRCLE_PROJECT_REPONAME" | sed -E 's/_|-/ /g;s/lbh //;s/\<([a-z])/\U\1/g;')
+    ghRepoId=$(curl -sS "https://api.github.com/repos/LBHackney-IT/$CIRCLE_PROJECT_REPONAME" | pcregrep -oM '^{\s+"id": ?\K\d+(?=,)')
+    baseUrl=$([[ -e test/baseURL.txt ]] && (cat 'test/baseURL.txt' | perl -pe 's/\*+(?=\.amazonaws)/eu-west-2/'))
+    
+    #For now, hardcoded environment
+    ENVIRONMENT="staging"
+    baseUrlEnvObj="{\"$ENVIRONMENT\":\"$baseUrl\"}"
 
-# You can do the grouping by making a db combination a capture group & the find all the results with that capture group
+    apiRecord="{\"name\":\"$projectName\",\"githubId\":1$ghRepoId,\"githubUrl\":\"$ghPageUrl\",\"baseUrl\":$baseUrlEnvObj,\"dependencies\":$dependenciesObject}"
+
+    curl -X POST \
+        -H "Content-Type: application/json" \
+        -H "x-api-key: $API_KEY" \
+        -d "$apiRecord" \
+        "$API_BASE_URL/v1/apis"
+}
+
 echo "End!"
