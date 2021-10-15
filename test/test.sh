@@ -233,6 +233,10 @@ done | sort -u | {
     } ; done | tr '\n' ',' | sed -E 's/,$//')
     
     dependenciesObject="{\"databases\":[$jsonDbDepObj]}"
+    ghPageUrl="https://github.com/LBHackney-IT/$CIRCLE_PROJECT_REPONAME"
+    projectName=$(echo "$CIRCLE_PROJECT_REPONAME" | sed -E 's/_|-/ /g;s/lbh //;s/\<([a-z])/\U\1/g;')
+    ghRepoId=$(curl -sS "https://api.github.com/repos/LBHackney-IT/$CIRCLE_PROJECT_REPONAME" | pcregrep -oM '^{\s+"id": ?\K\d+(?=,)')
+    baseUrl=$([[ -e test/baseURL.txt ]] && (cat 'test/baseURL.txt' | perl -pe 's/\*+(?=\.amazonaws)/eu-west-2/'))
 }
 
 # You can do the grouping by making a db combination a capture group & the find all the results with that capture group
