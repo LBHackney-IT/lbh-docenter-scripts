@@ -191,7 +191,9 @@ function scanAndFollowDependencies {
         local eRoute=$(echo "$accumulator" | grep -oP '(?<=Route: ).+?(?=\!)')
         local eType=$(echo "$accumulator" | grep -oP '(?<=Type: )\w+(?=\!)')
         echo "<DbName: $dbName! DbType: $dbType! Name: $eName! Type: $eType! Route: $eRoute!>"
-    else
+        return 0
+    fi
+
         getFileScopeMethodCallsWithinMethod $targetMethod $scannedFile | while read localCall ; do {
             scanAndFollowDependencies "$scannedFile" "$(append_to_endpoint_info "$accumulator" "$localCall")"
         } ; done
@@ -206,7 +208,6 @@ function scanAndFollowDependencies {
             dependencyFileName=$(find_dependency_file_name_in_api_directory "${dependencyTypeLookup[$dependencyVarName]}")
             scanAndFollowDependencies "$dependencyFileName" "$(append_to_endpoint_info "$accumulator" "$dependencyMethod")"
         } ; done
-    fi
 }
 
 controllersList=$(find "$apiProjectDirectory/V1/Controllers" -mindepth 1)
