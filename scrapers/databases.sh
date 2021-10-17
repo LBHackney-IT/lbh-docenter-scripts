@@ -137,6 +137,12 @@ function append_to_endpoint_info {
     echo $oldEndpointInfo | perl -pe "s/(?<=CallChain: )([\w ,]+)(?=!)/\1, $methodName/g"
 }
 
+function get_field_from_accumulator {
+    local fieldName=$1
+    local accumulatorVal=$2
+    echo "$accumulatorVal" | grep -oP "(?<=$fieldName: )[^!]+(?=!)"
+}
+
 function get_controller_route {
     local controllerFilePath=$1
     pcregrep -oM '\[Route\(\"[^"]+\"\)\][\S\s]+public class \w+ : Controller' $controllerFilePath |
@@ -187,9 +193,9 @@ function scanAndFollowDependencies {
         [[ -z "$dbType" && -z "$dbName" ]] && return 1
 
         # TODO: Extract this into a function
-        local eName=$(echo "$accumulator" | grep -oP '(?<=Name: )\w+(?=\!)')
-        local eRoute=$(echo "$accumulator" | grep -oP '(?<=Route: ).+?(?=\!)')
-        local eType=$(echo "$accumulator" | grep -oP '(?<=Type: )\w+(?=\!)')
+        local eName=$(get_field_from_accumulator Name "$accumulator")
+        local eRoute=$(get_field_from_accumulator Route "$accumulator")
+        local eType=$(get_field_from_accumulator Type "$accumulator")
         echo "<DbName: $dbName! DbType: $dbType! Name: $eName! Type: $eType! Route: $eRoute!>"
         return 0
     fi
@@ -224,8 +230,8 @@ done | sort -u | {
     IFS=''; read -r -d '' executionTreeOutput; IFS='\n';
     databases=$(echo -e "$executionTreeOutput" | grep -oP '<DbName: \w+! DbType: \w+!' | sort -u)
     jsonDbDepObj=$(echo -e "$databases" | while read database ; do {
-        dbTechName=$(echo "$database" | grep -oP '(?<=DbName: )\w+(?=!)')
-        dbType=$(echo "$database" | grep -oP '(?<=DbType: )\w+(?=!)')
+        dbTechName=$(get_field_from_accumulator DbName "$database")
+        dbType=$(get_field_from_accumulator DbType "$database")
         jsonEndpointsList=$(echo -e "$executionTreeOutput" | grep -P "^$database" | perl -pe 's/<.+?! Name: (\w+)! Type: (\w+)! Route: ([^!]+)!>/\{"name":"\1"\,"httpMethod":"\2","path":"\3"}/gm' | tr '\n' ',' | sed -E 's/,$//')
         echo -e "{\"technicalName\":\"$dbTechName\",\"type\":\"$dbType\",\"endpointsUsingIt\":[$jsonEndpointsList]}"
     } ; done | tr '\n' ',' | sed -E 's/,$//')
